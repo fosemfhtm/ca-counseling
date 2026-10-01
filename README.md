@@ -92,7 +92,13 @@ When2meet처럼 주간 시간표에서 드래그해서 상담 시간을 열고 �
 
 ## 코드를 수정했다면
 
-- **Code.gs 수정** → Apps Script에서 **배포 → 배포 관리 → (연필) → 버전: 새 버전 → 배포**. 새 버전으로 배포해야 반영되고, URL은 그대로 유지됩니다.
+- **Code.gs 수정** → clasp로 올리고 기존 배포를 새 버전으로 바꿉니다 (URL 유지).
+  ```bash
+  clasp push --force
+  clasp update-deployment <배포ID> -d "변경 내용"
+  ```
+  `.clasp.json`(스크립트 ID)과 `apps-script/private.gs`(상담자 이름 등)는 `.gitignore` 대상이라 GitHub에 올라가지 않고, clasp로만 Apps Script에 올라갑니다.
+  clasp 없이 하려면 Apps Script에 붙여넣은 뒤 **배포 → 배포 관리 → (연필) → 버전: 새 버전 → 배포**.
 - **웹 페이지 수정** → GitHub에 push하면 1~2분 뒤 반영됩니다.
 
 ## 로컬 미리보기

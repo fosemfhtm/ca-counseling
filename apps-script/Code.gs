@@ -6,7 +6,7 @@
  */
 
 const CONFIG = {
-  COUNSELOR_NAME: '',            // 상담일지 "상담자" 칸에 자동으로 들어갈 이름
+  COUNSELOR_NAME: '',            // 상담일지 "상담자" 칸 (private.gs의 PRIVATE.COUNSELOR_NAME이 있으면 그 값을 사용)
   METHOD: '대면상담',             // 상담방법 (모든 예약에 동일하게 기록)
   ADMIN_EMAIL: '',               // 새 예약 알림 받을 주소 (비우면 스크립트 소유자)
   MIN_HOURS_BEFORE: 3,           // 상담 시작 N시간 전까지만 예약 가능
@@ -196,7 +196,7 @@ function buildBooking_(d, slot) {
     '국적': d.nationality,
     '연락처': safe_(d.phone),
     '이메일': safe_(d.email),
-    '상담자': CONFIG.COUNSELOR_NAME,
+    '상담자': counselorName_(),
     '상담방법': CONFIG.METHOD,
     '상담구분': d.route === '의뢰상담' ? '의뢰상담' : '일반상담',
     '호소문제유형': formatTopics_(d.topics),
@@ -711,6 +711,11 @@ function setCells_(sh, rowNum, obj) {
 
 let tzCache_;
 function tz_() { return tzCache_ || (tzCache_ = SpreadsheetApp.getActive().getSpreadsheetTimeZone()); }
+
+// 공개 저장소에 올리지 않는 값은 private.gs(.gitignore 대상)에 둔다
+function counselorName_() {
+  return (typeof PRIVATE !== 'undefined' && PRIVATE.COUNSELOR_NAME) || CONFIG.COUNSELOR_NAME;
+}
 
 function str_(v) { return (v === null || v === undefined ? '' : String(v)).trim(); }
 
