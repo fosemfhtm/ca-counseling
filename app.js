@@ -132,8 +132,8 @@
     try {
       const c = JSON.parse(localStorage.getItem(SLOT_CACHE));
       if (!c || Date.now() - c.at > 24 * 3600 * 1000) return null;
-      const now = new Date();
-      return c.slots.filter((s) => { const [y, m, d] = s.date.split('-').map(Number); const [h, mi] = s.start.split(':').map(Number); return new Date(y, m - 1, d, h, mi) > now; });
+      // 서버가 준 마감 시각(전날 12시)이 지난 시간은 빼고 보여준다
+      return c.slots.filter((s) => s.deadline && s.deadline > Date.now());
     } catch (e) { return null; }
   }
   function writeSlotCache(slots) {

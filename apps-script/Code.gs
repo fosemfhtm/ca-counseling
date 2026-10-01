@@ -9,7 +9,8 @@ const CONFIG = {
   COUNSELOR_NAME: '',            // 상담일지 "상담자" 칸 (private.gs의 PRIVATE.COUNSELOR_NAME이 있으면 그 값을 사용)
   METHOD: '대면상담',             // 상담방법 (모든 예약에 동일하게 기록)
   ADMIN_EMAIL: '',               // 새 예약 알림 받을 주소 (비우면 스크립트 소유자)
-  MIN_HOURS_BEFORE: 3,           // 상담 시작 N시간 전까지만 예약 가능
+  CLOSE_DAYS_BEFORE: 1,          // 상담일 N일 전 CLOSE_HOUR시에 예약 마감 (1, 12 → 전날 낮 12시)
+  CLOSE_HOUR: 12,
   MAX_DAYS_AHEAD: 14,            // 학생에게는 오늘부터 N일 안의 시간만 보임 (관리자는 더 먼 날짜도 열어둘 수 있음)
   ONE_ACTIVE_PER_STUDENT: true,  // 한 학번당 예정된 예약은 1건만 허용
   SEND_STUDENT_EMAIL: true,      // 학생에게 예약 확인 메일 발송
@@ -111,7 +112,7 @@ function doPost(e) {
  * ======================================================= */
 
 // 열린 슬롯 목록은 캐시에 두고(최대 10분), 슬롯이 바뀌는 곳에서 invalidateSlots_()로 비운다
-const SLOT_CACHE_KEY = 'openSlots_v1';
+const SLOT_CACHE_KEY = 'openSlots_v2';
 
 function listOpenSlots_() {
   const cache = CacheService.getScriptCache();
@@ -124,13 +125,21 @@ function listOpenSlots_() {
       .map(slotFromRow_)
       .filter((s) => s && s.status === SLOT.OPEN && !s.bookingId)
       .map((s) => { const p = publicSlot_(s); p.t = toDate_(s.date, s.start).getTime(); return p; })
-      .filter((s) => s.t > now)
+      .filter((s) => s.deadline > now)
       .sort((a, b) => a.t - b.t);
     try { cache.put(SLOT_CACHE_KEY, JSON.stringify(all), 600); } catch (err) { /* 100KB 초과 등 */ }
   }
-  const cutoff = Date.now() + CONFIG.MIN_HOURS_BEFORE * 3600 * 1000;
-  const horizon = Date.now() + CONFIG.MAX_DAYS_AHEAD * 24 * 3600 * 1000;
-  return all.filter((s) => s.t >= cutoff && s.t <= horizon).map((s) => publicSlot_(s));
+  const now = Date.now();
+  const horizon = now + CONFIG.MAX_DAYS_AHEAD * 24 * 3600 * 1000;
+  return all.filter((s) => s.deadline > now && s.t <= horizon).map((s) => publicSlot_(s));
+}
+
+// 예약 마감 시각: 상담일 CLOSE_DAYS_BEFORE일 전 CLOSE_HOUR시 (스크립트 시간대 기준)
+function deadline_(ymd) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const prev = new Date(Date.UTC(y, m - 1, d - CONFIG.CLOSE_DAYS_BEFORE));
+  const prevYmd = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}-${String(prev.getUTCDate()).padStart(2, '0')}`;
+  return toDate_(prevYmd, `${String(CONFIG.CLOSE_HOUR).padStart(2, '0')}:00`).getTime();
 }
 
 function invalidateSlots_() {
@@ -159,13 +168,13 @@ function slotFromRow_(r) {
 }
 
 function publicSlot_(s) {
-  return { id: s.id, date: s.date, start: s.start, end: s.end, location: s.location };
+  return { id: s.id, date: s.date, start: s.start, end: s.end, location: s.location, deadline: s.deadline || deadline_(s.date) };
 }
 
 function isBookable_(s) {
   if (s.status !== SLOT.OPEN || s.bookingId) return false;
-  const left = toDate_(s.date, s.start).getTime() - Date.now();
-  return left >= CONFIG.MIN_HOURS_BEFORE * 3600 * 1000 && left <= CONFIG.MAX_DAYS_AHEAD * 24 * 3600 * 1000;
+  const now = Date.now();
+  return deadline_(s.date) > now && toDate_(s.date, s.start).getTime() - now <= CONFIG.MAX_DAYS_AHEAD * 24 * 3600 * 1000;
 }
 
 function hasUpcomingBooking_(bookSh, studentId) {
