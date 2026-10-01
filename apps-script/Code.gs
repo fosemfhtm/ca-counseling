@@ -111,8 +111,9 @@ function doPost(e) {
  * 예약 로직
  * ======================================================= */
 
-// 열린 슬롯 목록은 캐시에 두고(최대 10분), 슬롯이 바뀌는 곳에서 invalidateSlots_()로 비운다
-const SLOT_CACHE_KEY = 'openSlots_v2';
+// 열린 슬롯 목록(시트 내용)만 캐시에 두고(최대 10분), 슬롯이 바뀌는 곳에서 invalidateSlots_()로 비운다.
+// 마감·노출 기간은 설정이 바뀌어도 바로 반영되도록 매 요청마다 계산한다.
+const SLOT_CACHE_KEY = 'openSlots_v3';
 
 function listOpenSlots_() {
   const cache = CacheService.getScriptCache();
@@ -124,14 +125,18 @@ function listOpenSlots_() {
     all = readRows_(sheet_(SLOT_SHEET))
       .map(slotFromRow_)
       .filter((s) => s && s.status === SLOT.OPEN && !s.bookingId)
-      .map((s) => { const p = publicSlot_(s); p.t = toDate_(s.date, s.start).getTime(); return p; })
-      .filter((s) => s.deadline > now)
+      .map((s) => ({ id: s.id, date: s.date, start: s.start, end: s.end, location: s.location, t: toDate_(s.date, s.start).getTime() }))
+      .filter((s) => s.t > now)
       .sort((a, b) => a.t - b.t);
     try { cache.put(SLOT_CACHE_KEY, JSON.stringify(all), 600); } catch (err) { /* 100KB 초과 등 */ }
   }
   const now = Date.now();
   const horizon = now + CONFIG.MAX_DAYS_AHEAD * 24 * 3600 * 1000;
-  return all.filter((s) => s.deadline > now && s.t <= horizon).map((s) => publicSlot_(s));
+  const deadlines = {};
+  return all
+    .map((s) => { s.deadline = deadlines[s.date] || (deadlines[s.date] = deadline_(s.date)); return s; })
+    .filter((s) => s.deadline > now && s.t <= horizon)
+    .map(publicSlot_);
 }
 
 // 예약 마감 시각: 상담일 CLOSE_DAYS_BEFORE일 전 CLOSE_HOUR시 (스크립트 시간대 기준)
