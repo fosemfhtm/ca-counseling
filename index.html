@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>학업·진로 상담 예약</title>
+  <meta name="description" content="CA 학업·진로 상담 시간 예약 및 사전 정보 입력">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow" id="counselor"></p>
+      <h1 id="title">학업·진로 상담 예약</h1>
+      <p class="lead" id="subtitle"></p>
+      <ol class="steps" aria-label="진행 단계">
+        <li data-step="1" class="is-current"><span>1</span>시간 선택</li>
+        <li data-step="2"><span>2</span>사전 정보 입력</li>
+        <li data-step="3"><span>3</span>예약 완료</li>
+      </ol>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="banner" id="demo-banner" hidden>
+      <strong>데모 모드</strong> — <code>config.js</code>에 Apps Script URL이 없어 예시 시간이 표시됩니다. 신청해도 저장되지 않습니다.
+    </div>
+
+    <!-- 1. 시간 선택 -->
+    <section class="card" id="step-slots" aria-labelledby="slots-h">
+      <div class="card-head">
+        <h2 id="slots-h">상담 시간 선택</h2>
+        <button type="button" class="link-btn" id="reload-slots">새로고침</button>
+      </div>
+      <p class="muted">원하는 시간을 눌러 주세요. 표시된 시간은 모두 예약할 수 있는 시간입니다.</p>
+      <div id="slot-status" class="status" role="status"></div>
+      <div id="slot-list" class="slot-list"></div>
+    </section>
+
+    <!-- 2. 정보 입력 -->
+    <section class="card" id="step-form" aria-labelledby="form-h" hidden>
+      <div class="card-head">
+        <h2 id="form-h">사전 정보 입력</h2>
+      </div>
+      <div class="picked">
+        <div>
+          <span class="picked-label">선택한 시간</span>
+          <strong id="picked-text"></strong>
+          <span class="muted" id="picked-loc"></span>
+        </div>
+        <button type="button" class="btn ghost small" id="change-slot">시간 변경</button>
+      </div>
+
+      <form id="booking-form" novalidate>
+        <fieldset>
+          <legend>기본 정보</legend>
+          <p class="legend-note">모든 항목이 필수입니다. 상담 기록에는 익명으로 처리됩니다.</p>
+          <div class="grid">
+            <label class="field">
+              <span>학번 <em>*</em></span>
+              <input name="studentId" required inputmode="numeric" pattern="[0-9A-Za-z]{4,12}" maxlength="12" placeholder="예: 20240123">
+            </label>
+            <label class="field">
+              <span>이름 <em>*</em></span>
+              <input name="name" required maxlength="30" autocomplete="name">
+            </label>
+            <div class="field">
+              <span class="field-label" id="gender-label">성별 <em>*</em></span>
+              <div class="chips" role="radiogroup" aria-labelledby="gender-label" data-required="gender">
+                <label class="chip"><input type="radio" name="gender" value="남자"><span>남자</span></label>
+                <label class="chip"><input type="radio" name="gender" value="여자"><span>여자</span></label>
+              </div>
+            </div>
+            <div class="field">
+              <span class="field-label" id="nationality-label">국적 <em>*</em></span>
+              <div class="chips" role="radiogroup" aria-labelledby="nationality-label" data-required="nationality">
+                <label class="chip"><input type="radio" name="nationality" value="내국인"><span>내국인</span></label>
+                <label class="chip"><input type="radio" name="nationality" value="외국인(International)"><span>외국인 (International)</span></label>
+              </div>
+            </div>
+            <label class="field">
+              <span>학과 <em>*</em></span>
+              <input name="major" required maxlength="40" value="건설환경공학과">
+            </label>
+            <label class="field">
+              <span>과정 <em>*</em></span>
+              <select name="course" required>
+                <option value="">선택</option>
+                <option>1학년</option>
+                <option>2학년</option>
+                <option>3학년</option>
+                <option>4학년</option>
+                <option>석사과정</option>
+                <option>박사과정</option>
+                <option>석박사통합과정</option>
+                <option>기타</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>연락처 <em>*</em></span>
+              <input name="phone" type="tel" required maxlength="20" autocomplete="tel" placeholder="010-0000-0000">
+            </label>
+            <label class="field">
+              <span>이메일 <em>*</em></span>
+              <input name="email" type="email" required maxlength="80" autocomplete="email" placeholder="예약 확인 메일 수신용">
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>상담 장소</legend>
+          <label class="field">
+            <span>교내 카페 <small>(다른 곳을 원하면 선택)</small></span>
+            <select name="cafe" id="cafe-select">
+              <option value="" id="cafe-default">지정 장소 그대로</option>
+            </select>
+            <span class="hint">상담은 대면으로 진행됩니다.</span>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>신청 계기</legend>
+          <div class="field">
+            <span class="field-label" id="route-label">어떻게 신청하게 되었나요?</span>
+            <div class="chips" role="radiogroup" aria-labelledby="route-label">
+              <label class="chip"><input type="radio" name="route" value="일반상담" checked><span>직접 신청</span></label>
+              <label class="chip"><input type="radio" name="route" value="의뢰상담"><span>교수님·학과 등의 권유</span></label>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>상담받고 싶은 내용</legend>
+          <div class="field">
+            <span class="field-label" id="topics-label">고민 분야 <em>*</em> <small>(해당하는 것을 모두 선택)</small></span>
+            <div class="topic-groups" id="topics" role="group" aria-labelledby="topics-label"></div>
+            <p class="error" id="topics-error" hidden>하나 이상 선택해 주세요.</p>
+          </div>
+
+          <label class="field">
+            <span>주요 고민 <em>*</em> <small>(항목별로 짧게)</small></span>
+            <textarea name="mainConcerns" required minlength="4" maxlength="600" rows="4"
+              placeholder="1. 2학기 수강과목 고민&#10;2. 개별연구 주제 선정&#10;3. 인턴은 어떻게 시작하는지"></textarea>
+            <span class="hint">상담에서 다루고 싶은 주제를 한 줄에 하나씩 적어 주세요.</span>
+          </label>
+
+          <label class="field">
+            <span>자세한 상황 <small>(선택)</small></span>
+            <textarea name="details" maxlength="2000" rows="5"
+              placeholder="예: 6개 과목 중 2개를 고르고 싶은데, 후보는 ○○, ○○, ○○입니다. 대학원보다는 취업에 관심이 있어요."></textarea>
+            <span class="hint">고민 중인 과목, 연구실, 진로 후보 등을 미리 알려주시면 상담 전에 자료를 준비해 둘게요.</span>
+            <small class="counter"><span id="details-count">0</span> / 2000</small>
+          </label>
+        </fieldset>
+
+        <fieldset class="consent">
+          <legend>개인정보 수집·이용 동의</legend>
+          <dl class="consent-box">
+            <dt>수집 항목</dt><dd>학번, 이름, 성별, 학과, 과정, 국적, 연락처, 이메일, 상담 희망 내용</dd>
+            <dt>이용 목적</dt><dd id="privacy-purpose"></dd>
+            <dt>보유 기간</dt><dd id="privacy-retention"></dd>
+            <dt>동의 거부</dt><dd>동의하지 않을 수 있으며, 이 경우 온라인 예약이 어렵습니다.</dd>
+          </dl>
+          <label class="check">
+            <input type="checkbox" name="consent" required>
+            <span>위 내용을 확인했으며 개인정보 수집·이용에 동의합니다. <em>*</em></span>
+          </label>
+        </fieldset>
+
+        <!-- 스팸 방지용 (사람에게는 보이지 않음) -->
+        <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+        <div class="form-error" id="form-error" role="alert" hidden></div>
+        <button type="submit" class="btn primary block" id="submit-btn">예약 신청하기</button>
+      </form>
+    </section>
+
+    <!-- 3. 완료 -->
+    <section class="card done" id="step-done" hidden aria-labelledby="done-h">
+      <div class="done-mark" aria-hidden="true">✓</div>
+      <h2 id="done-h">예약이 완료되었습니다</h2>
+      <dl class="summary" id="done-summary"></dl>
+      <p class="muted">입력하신 이메일로 확인 메일을 보내드렸어요.<br>일정 변경·취소는 확인 메일에 회신해 주세요.</p>
+      <button type="button" class="btn ghost" id="restart">처음으로</button>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p id="contact"></p>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="app.js?v=3"></script>
+</body>
+</html>
