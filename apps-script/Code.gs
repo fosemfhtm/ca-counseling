@@ -9,8 +9,8 @@ const CONFIG = {
   COUNSELOR_NAME: '',            // 상담일지 "상담자" 칸 (private.gs의 PRIVATE.COUNSELOR_NAME이 있으면 그 값을 사용)
   METHOD: '대면상담',             // 상담방법 (모든 예약에 동일하게 기록)
   ADMIN_EMAIL: '',               // 새 예약 알림 받을 주소 (비우면 스크립트 소유자)
-  CLOSE_DAYS_BEFORE: 1,          // 상담일 N일 전 CLOSE_HOUR시에 예약 마감 (1, 12 → 전날 낮 12시)
-  CLOSE_HOUR: 12,
+  CLOSE_DAYS_BEFORE: 0,          // 상담일 N일 전 CLOSE_HOUR시에 예약 마감 (0, 0 → 상담일 0시 = 전날 밤 12시)
+  CLOSE_HOUR: 0,
   MAX_DAYS_AHEAD: 14,            // 학생에게는 오늘부터 N일 안의 시간만 보임 (관리자는 더 먼 날짜도 열어둘 수 있음)
   ONE_ACTIVE_PER_STUDENT: true,  // 한 학번당 예정된 예약은 1건만 허용
   SEND_STUDENT_EMAIL: true,      // 학생에게 예약 확인 메일 발송

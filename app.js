@@ -132,7 +132,7 @@
     try {
       const c = JSON.parse(localStorage.getItem(SLOT_CACHE));
       if (!c || Date.now() - c.at > 24 * 3600 * 1000) return null;
-      // 서버가 준 마감 시각(전날 12시)이 지난 시간은 빼고 보여준다
+      // 서버가 준 마감 시각(전날 밤 12시)이 지난 시간은 빼고 보여준다
       return c.slots.filter((s) => s.deadline && s.deadline > Date.now());
     } catch (e) { return null; }
   }
