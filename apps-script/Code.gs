@@ -92,6 +92,7 @@ function doPost(e) {
       appendObjects_(bookSh, [booking], BOOKING_TEXT_COLS);
       setCells_(slotSh, slot.row, { '슬롯ID': slot.id, '상태': SLOT.BOOKED, '예약ID': booking['예약ID'] });
       SpreadsheetApp.flush();
+      invalidateSlots_();
     } finally {
       lock.releaseLock();
     }
@@ -108,12 +109,35 @@ function doPost(e) {
  * 예약 로직
  * ======================================================= */
 
+// 열린 슬롯 목록은 캐시에 두고(최대 10분), 슬롯이 바뀌는 곳에서 invalidateSlots_()로 비운다
+const SLOT_CACHE_KEY = 'openSlots_v1';
+
 function listOpenSlots_() {
-  return readRows_(sheet_(SLOT_SHEET))
-    .map(slotFromRow_)
-    .filter((s) => s && isBookable_(s))
-    .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start))
-    .map(publicSlot_);
+  const cache = CacheService.getScriptCache();
+  let all = null;
+  const hit = cache.get(SLOT_CACHE_KEY);
+  if (hit) { try { all = JSON.parse(hit); } catch (err) { all = null; } }
+  if (!all) {
+    const now = Date.now();
+    all = readRows_(sheet_(SLOT_SHEET))
+      .map(slotFromRow_)
+      .filter((s) => s && s.status === SLOT.OPEN && !s.bookingId)
+      .map((s) => { const p = publicSlot_(s); p.t = toDate_(s.date, s.start).getTime(); return p; })
+      .filter((s) => s.t > now)
+      .sort((a, b) => a.t - b.t);
+    try { cache.put(SLOT_CACHE_KEY, JSON.stringify(all), 600); } catch (err) { /* 100KB 초과 등 */ }
+  }
+  const cutoff = Date.now() + CONFIG.MIN_HOURS_BEFORE * 3600 * 1000;
+  return all.filter((s) => s.t >= cutoff).map((s) => publicSlot_(s));
+}
+
+function invalidateSlots_() {
+  try { CacheService.getScriptCache().remove(SLOT_CACHE_KEY); } catch (err) { /* ignore */ }
+}
+
+// 슬롯 시트를 손으로 고쳐도 캐시가 바로 비워지도록 (단순 트리거)
+function onEdit(e) {
+  if (e && e.range && e.range.getSheet().getName() === SLOT_SHEET) invalidateSlots_();
 }
 
 function slotFromRow_(r) {
@@ -363,6 +387,7 @@ function adminApply_(d) {
     appendObjects_(sh, newRows, SLOT_TEXT_COLS);
     added = newRows.length;
     SpreadsheetApp.flush();
+    invalidateSlots_();
     return { ok: true, added, reopened, removed, relocated, skipped };
   } finally {
     lock.releaseLock();
@@ -515,6 +540,7 @@ function generateSlots(o) {
       }
     }
     appendObjects_(sh, rows, SLOT_TEXT_COLS);
+    invalidateSlots_();
     return rows.length;
   } finally {
     lock.releaseLock();
@@ -608,6 +634,7 @@ function cancelSelectedBooking() {
     const slotSh = sheet_(SLOT_SHEET);
     const slot = readRows_(slotSh).map(slotFromRow_).find((s) => s && s.bookingId === str_(r['예약ID']));
     if (slot) setCells_(slotSh, slot.row, { '상태': SLOT.OPEN, '예약ID': '' });
+    invalidateSlots_();
   } finally {
     lock.releaseLock();
   }
@@ -669,13 +696,16 @@ function headerMap_(sh) {
 }
 
 // 머리글 이름을 키로 하는 객체 배열 (행 번호는 _row)
+// 시트 API 호출을 한 번으로 줄이기 위해 getDataRange로 머리글과 데이터를 함께 읽는다
 function readRows_(sh) {
-  const map = headerMap_(sh);
-  const last = sh.getLastRow();
-  if (last < 2) return [];
-  return sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues().map((v, i) => {
+  const values = sh.getDataRange().getValues();
+  if (values.length < 2) return [];
+  const map = {};
+  values[0].forEach((h, i) => { const key = str_(h); if (key) map[key] = i; });
+  const keys = Object.keys(map);
+  return values.slice(1).map((v, i) => {
     const o = { _row: i + 2 };
-    Object.keys(map).forEach((k) => { o[k] = v[map[k]]; });
+    keys.forEach((k) => { o[k] = v[map[k]]; });
     return o;
   });
 }
@@ -710,7 +740,8 @@ function setCells_(sh, rowNum, obj) {
  * ======================================================= */
 
 let tzCache_;
-function tz_() { return tzCache_ || (tzCache_ = SpreadsheetApp.getActive().getSpreadsheetTimeZone()); }
+// appsscript.json의 timeZone(Asia/Seoul) — 시트 API 호출 없이 바로 얻음
+function tz_() { return tzCache_ || (tzCache_ = Session.getScriptTimeZone()); }
 
 // 공개 저장소에 올리지 않는 값은 private.gs(.gitignore 대상)에 둔다
 function counselorName_() {

@@ -126,16 +126,52 @@
   function fmtSlot(s) { return `${fmtDay(s.date)} ${s.start}–${s.end}`; }
 
   /* ---------- 슬롯 ---------- */
+  // 지난번에 받은 목록을 먼저 보여주고(서버가 깨어나는 데 몇 초 걸림), 최신 목록이 오면 바꾼다
+  const SLOT_CACHE = 'ca_slots_cache';
+  function readSlotCache() {
+    try {
+      const c = JSON.parse(localStorage.getItem(SLOT_CACHE));
+      if (!c || Date.now() - c.at > 24 * 3600 * 1000) return null;
+      const now = new Date();
+      return c.slots.filter((s) => { const [y, m, d] = s.date.split('-').map(Number); const [h, mi] = s.start.split(':').map(Number); return new Date(y, m - 1, d, h, mi) > now; });
+    } catch (e) { return null; }
+  }
+  function writeSlotCache(slots) {
+    try { localStorage.setItem(SLOT_CACHE, JSON.stringify({ at: Date.now(), slots })); } catch (e) { /* ignore */ }
+  }
+
   async function loadSlots() {
-    setStatus('예약 가능한 시간을 불러오는 중…');
-    el.slotList.replaceChildren();
+    const cached = DEMO ? null : readSlotCache();
+    if (cached && cached.length) {
+      state.slots = cached;
+      renderSlots();
+      setStatus('최신 예약 현황을 확인하는 중…');
+    } else {
+      setStatus('예약 가능한 시간을 불러오는 중… 처음에는 몇 초 걸릴 수 있어요.');
+      el.slotList.replaceChildren(skeleton());
+    }
     try {
       state.slots = DEMO ? demoSlots() : await apiGetSlots();
+      if (!DEMO) writeSlotCache(state.slots);
       renderSlots();
     } catch (err) {
       console.error(err);
       setStatus('시간을 불러오지 못했습니다. 잠시 후 새로고침해 주세요.', true);
+      if (!cached) el.slotList.replaceChildren();
     }
+  }
+
+  function skeleton() {
+    const wrap = document.createElement('div');
+    wrap.className = 'skeleton';
+    wrap.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 2; i++) {
+      const day = document.createElement('div');
+      day.className = 'slot-day';
+      day.innerHTML = '<div class="sk-line"></div><div class="slot-grid">' + '<div class="sk-slot"></div>'.repeat(4) + '</div>';
+      wrap.append(day);
+    }
+    return wrap;
   }
 
   function setStatus(msg, isError = false) {
@@ -247,6 +283,7 @@
         if (res.code === 'SLOT_TAKEN') {
           showError(res.error);
           state.slot = null;
+          try { localStorage.removeItem(SLOT_CACHE); } catch (e) { /* ignore */ }
           await loadSlots();
           setTimeout(() => goTo(1), 1200);
         } else {
@@ -270,6 +307,7 @@
   }
 
   function showDone(res, p) {
+    writeSlotCache(state.slots.filter((x) => x.id !== (res.slot || state.slot).id));
     const s = res.slot || state.slot;
     const rows = [
       ['예약번호', res.bookingId],

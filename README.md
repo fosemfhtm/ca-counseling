@@ -106,10 +106,10 @@ When2meet처럼 주간 시간표에서 드래그해서 상담 시간을 열고 �
 `APPS_SCRIPT_URL`이 비어 있으면 예시 시간으로 동작하는 데모 모드가 됩니다.
 
 ```bash
-py -m http.server 8765
+py -m http.server 8766
 ```
 
-브라우저에서 http://localhost:8765 를 엽니다.
+브라우저에서 http://localhost:8766 를 엽니다.
 
 ## 개인정보 참고
 

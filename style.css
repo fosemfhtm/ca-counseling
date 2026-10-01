@@ -300,3 +300,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .tg-cell.open { color: var(--accent-text); }
 .mode-location .tg-cell:not(.open):not(.booked):not(.removing) { cursor: default; }
 .mode-location .tg-cell:not(.open):not(.booked):not(.removing):hover { background: transparent; }
+
+/* 불러오는 중 자리표시 */
+.sk-line, .sk-slot { border-radius: 8px; background: linear-gradient(90deg, var(--surface-2) 0%, var(--border) 50%, var(--surface-2) 100%); background-size: 200% 100%; animation: sk 1.2s ease-in-out infinite; }
+.sk-line { width: 120px; height: 16px; margin-bottom: 12px; }
+.sk-slot { height: 46px; }
+@keyframes sk { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk-line, .sk-slot { animation: none; } }
