@@ -10,6 +10,7 @@ const CONFIG = {
   METHOD: '대면상담',             // 상담방법 (모든 예약에 동일하게 기록)
   ADMIN_EMAIL: '',               // 새 예약 알림 받을 주소 (비우면 스크립트 소유자)
   MIN_HOURS_BEFORE: 3,           // 상담 시작 N시간 전까지만 예약 가능
+  MAX_DAYS_AHEAD: 14,            // 학생에게는 오늘부터 N일 안의 시간만 보임 (관리자는 더 먼 날짜도 열어둘 수 있음)
   ONE_ACTIVE_PER_STUDENT: true,  // 한 학번당 예정된 예약은 1건만 허용
   SEND_STUDENT_EMAIL: true,      // 학생에게 예약 확인 메일 발송
   SITE_TITLE: 'CA 학업·진로 상담',
@@ -128,7 +129,8 @@ function listOpenSlots_() {
     try { cache.put(SLOT_CACHE_KEY, JSON.stringify(all), 600); } catch (err) { /* 100KB 초과 등 */ }
   }
   const cutoff = Date.now() + CONFIG.MIN_HOURS_BEFORE * 3600 * 1000;
-  return all.filter((s) => s.t >= cutoff).map((s) => publicSlot_(s));
+  const horizon = Date.now() + CONFIG.MAX_DAYS_AHEAD * 24 * 3600 * 1000;
+  return all.filter((s) => s.t >= cutoff && s.t <= horizon).map((s) => publicSlot_(s));
 }
 
 function invalidateSlots_() {
@@ -162,8 +164,8 @@ function publicSlot_(s) {
 
 function isBookable_(s) {
   if (s.status !== SLOT.OPEN || s.bookingId) return false;
-  const startsAt = toDate_(s.date, s.start).getTime();
-  return startsAt - Date.now() >= CONFIG.MIN_HOURS_BEFORE * 3600 * 1000;
+  const left = toDate_(s.date, s.start).getTime() - Date.now();
+  return left >= CONFIG.MIN_HOURS_BEFORE * 3600 * 1000 && left <= CONFIG.MAX_DAYS_AHEAD * 24 * 3600 * 1000;
 }
 
 function hasUpcomingBooking_(bookSh, studentId) {
